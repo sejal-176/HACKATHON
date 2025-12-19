@@ -1,0 +1,7 @@
+{
+  "name": "StudentPool - Smart Campus Mobility",
+  "description": "A dedicated ride-pooling platform for students to share taxi/cab fares, integrate with Maps, and reduce carbon footprint.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
