@@ -2,25 +2,55 @@
 import React, { useState } from 'react';
 import { School, Info, Sparkles, MapPin, Navigation, Globe, Shield, TrendingUp } from 'lucide-react';
 import InputForm from './components/InputForm';
-import AnalysisResults from './components/AnalysisResults';
+import MatchResults from './components/MatchResults';
 import ActivityFeed from './components/ActivityFeed';
-import { getMobilityInsights } from './services/geminiService';
-import { RideDetails, AnalysisResponse } from './types';
+import { requestMatch } from './services/matchService';
+import { MatchRequest, Pool, AppUser } from './types';
+import AuthGate from './components/AuthGate';
+import DriverDashboard from './components/DriverDashboard';
+import ConfirmScreen from './components/ConfirmScreen';
+import { savePool } from './services/dbService';
 
 const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [results, setResults] = useState<{ details: RideDetails; analysis: AnalysisResponse } | null>(null);
+  const [pool, setPool] = useState<Pool | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const handleAnalysis = async (details: RideDetails) => {
+  const handleMatch = async (details: MatchRequest) => {
     setIsLoading(true);
     try {
-      const analysis = await getMobilityInsights(details);
-      setResults({ details, analysis });
+      const enriched: MatchRequest = {
+        ...details,
+        ownerId: user?.id,
+        ownerName: user?.name || 'You',
+        ownerGender: user?.gender,
+      };
+      const res = await requestMatch(enriched);
+      setPool(res.pool);
+      setShowConfirm(true);
     } catch (error) {
-      console.error("Analysis failed", error);
+      console.error("Match failed", error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const confirmBooking = async () => {
+    if (!pool) return;
+    try {
+      await savePool(pool);
+    } catch (e) {
+      console.error('Failed to persist pool', e);
+    }
+    if (pool.deepLink) {
+      window.open(pool.deepLink, '_blank');
+    }
+    setShowConfirm(false);
+  };
+
+  const cancelBooking = () => {
+    setShowConfirm(false);
   };
 
   return (
@@ -54,12 +84,17 @@ const App: React.FC = () => {
         </header>
 
         {/* Core Layout */}
+        {!user ? (
+          <div className="max-w-3xl mx-auto">
+            <AuthGate onLogin={setUser} />
+          </div>
+        ) : user.role === 'passenger' ? (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-16 items-start">
           <div className="xl:col-span-4 lg:px-4 space-y-10">
             <div className="sticky top-12 space-y-10">
-              <InputForm onSubmit={handleAnalysis} isLoading={isLoading} />
+              <InputForm onSubmit={handleMatch} isLoading={isLoading} currentUser={user} />
               
-              {!results && (
+              {!pool && (
                 <div className="bg-white rounded-[3rem] p-10 shadow-3xl border border-slate-50 relative overflow-hidden group">
                   <div className="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-all duration-700">
                     <Shield className="w-64 h-64" />
@@ -89,11 +124,13 @@ const App: React.FC = () => {
           </div>
 
           <div className="xl:col-span-8 min-h-[800px]">
-            {results ? (
-              <AnalysisResults 
-                analysis={results.analysis} 
-                details={results.details}
-              />
+            {pool ? (
+              <>
+                <MatchResults pool={pool} disableBooking />
+                {showConfirm && (
+                  <ConfirmScreen pool={pool} onConfirm={confirmBooking} onCancel={cancelBooking} />
+                )}
+              </>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
                 {/* Dashboard Placeholder */}
@@ -104,7 +141,7 @@ const App: React.FC = () => {
                   </div>
                   <h3 className="text-3xl font-black text-slate-700 mb-4 tracking-tight">Intelligence Dashboard</h3>
                   <p className="text-slate-400 max-w-xs text-lg font-medium leading-relaxed opacity-80">
-                    Enter your destination to visualize massive student impact and group savings.
+                    Enter your destination to find a live pool near you and split fares seamlessly.
                   </p>
                 </div>
 
@@ -116,6 +153,9 @@ const App: React.FC = () => {
             )}
           </div>
         </div>
+        ) : (
+          <DriverDashboard user={user} />
+        )}
 
         {/* Footer */}
         <footer className="pt-32 pb-16 text-center">
@@ -125,7 +165,7 @@ const App: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 text-slate-400">
               <span className="text-xs font-black hover:text-teal-600 transition-colors cursor-default">Campus Hub Mumbai</span>
               <div className="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
-              <span className="text-xs font-black hover:text-teal-600 transition-colors cursor-default">Gemini Grounded Intelligence</span>
+              <span className="text-xs font-black hover:text-teal-600 transition-colors cursor-default">Smart Geo Matching</span>
               <div className="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
               <span className="text-xs font-black hover:text-teal-600 transition-colors cursor-default">Secure Peer Verification</span>
             </div>

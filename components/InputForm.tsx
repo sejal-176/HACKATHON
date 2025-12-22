@@ -1,20 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
-import { MapPin, Users, IndianRupee, School, Navigation, Search, Smartphone } from 'lucide-react';
-import { RideDetails } from '../types';
+import { MapPin, Users, School, Navigation, Search, Smartphone } from 'lucide-react';
+import { AppUser, MatchRequest } from '../types';
 
 interface InputFormProps {
-  onSubmit: (details: RideDetails) => void;
+  onSubmit: (details: MatchRequest) => void;
   isLoading: boolean;
+  currentUser?: AppUser | null;
 }
 
-const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
-  const [details, setDetails] = useState<RideDetails>({
+const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading, currentUser }) => {
+  const [details, setDetails] = useState<MatchRequest>({
     collegeName: 'IIT Bombay',
     destination: 'Main Building',
-    studentCount: 4,
-    totalFare: 420,
-    provider: 'Uber'
+    provider: 'Uber',
+    partySize: 2,
+    femaleOnly: false,
   });
 
   useEffect(() => {
@@ -28,6 +29,13 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
       });
     }
   }, []);
+
+  // Enforce female-only restriction: males cannot opt-in
+  useEffect(() => {
+    if (currentUser?.gender === 'male' && details.femaleOnly) {
+      setDetails((d) => ({ ...d, femaleOnly: false }));
+    }
+  }, [currentUser?.gender, details.femaleOnly]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,32 +105,34 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit, isLoading }) => {
 
         <div className="grid grid-cols-2 gap-5">
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Riders</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">We Are (Party Size)</label>
             <div className="relative group">
               <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
               <input
                 type="number"
-                min="2"
-                max="8"
+                min="1"
+                max="4"
                 className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-teal-500/10 focus:bg-white outline-none font-bold text-slate-700 transition-all"
-                value={details.studentCount}
-                onChange={(e) => setDetails({ ...details, studentCount: parseInt(e.target.value) || 2 })}
+                value={details.partySize || 1}
+                onChange={(e) => setDetails({ ...details, partySize: parseInt(e.target.value) || 1 })}
                 required
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Fare (₹)</label>
-            <div className="relative group">
-              <IndianRupee className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-teal-500" />
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Female-only Preference</label>
+            <div className="relative group flex items-center h-full">
               <input
-                type="number"
-                className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-teal-500/10 focus:bg-white outline-none font-bold text-slate-700 transition-all"
-                value={details.totalFare}
-                onChange={(e) => setDetails({ ...details, totalFare: parseFloat(e.target.value) || 0 })}
-                required
+                type="checkbox"
+                checked={!!details.femaleOnly}
+                onChange={(e) => setDetails({ ...details, femaleOnly: e.target.checked })}
+                className="w-5 h-5 ml-2 accent-teal-600 rounded cursor-pointer"
+                disabled={currentUser?.gender === 'male'}
               />
+              <span className={`ml-3 text-sm font-medium ${currentUser?.gender === 'male' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Match only with female passengers {currentUser?.gender === 'male' ? '(unavailable for male profile)' : ''}
+              </span>
             </div>
           </div>
         </div>
